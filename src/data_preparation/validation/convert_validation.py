@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import pandas as pd
 
+
 # 1. Define paths
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -10,6 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 VALIDATION_DIR = PROJECT_ROOT / "Data" / "Validation"
 OUTPUT_DIR = PROJECT_ROOT / "CSV" / "Validation"
 
+# Use Train CSV as the reference schema
+TRAIN_CSV = PROJECT_ROOT / "CSV" / "Train" / "train.csv"
 
 TARGET_FILES = 17
 
@@ -18,7 +21,59 @@ EXPECTED_NORMAL = 6572
 EXPECTED_SYBIL = 8718
 
 
-# 2. Get the first 17 JSON files
+# 2. Function to expand position strings
+
+def expand_position_column(df, source_column, prefix):
+
+    if source_column not in df.columns:
+        raise ValueError(
+            f"Missing column: {source_column}"
+        )
+
+    coordinates = []
+
+    for index, value in df[source_column].items():
+
+        if pd.isna(value):
+            coordinates.append([None, None, None])
+            continue
+
+        parts = str(value).split(",")
+
+        if len(parts) != 3:
+            raise ValueError(
+                f"Invalid position at row {index}: {value}"
+            )
+
+        try:
+            coordinates.append(
+                [float(part.strip()) for part in parts]
+            )
+
+        except ValueError:
+            raise ValueError(
+                f"Non-numeric position at row {index}: {value}"
+            )
+
+    coordinate_df = pd.DataFrame(
+        coordinates,
+        columns=[
+            f"{prefix}_x",
+            f"{prefix}_y",
+            f"{prefix}_z"
+        ],
+        index=df.index
+    )
+
+    # Add the expanded numeric columns
+    for column in coordinate_df.columns:
+        df[column] = coordinate_df[column]
+
+    # Remove the original string column
+    df.drop(columns=[source_column], inplace=True)
+
+
+# 3. Get the first 17 JSON files
 
 json_files = sorted(
     VALIDATION_DIR.glob("*.json")
@@ -36,7 +91,7 @@ for file_path in json_files:
     print(file_path.name)
 
 
-# 3. Read and flatten JSON messages
+# 4. Read and flatten JSON messages
 
 all_dataframes = []
 total_messages = 0
@@ -56,11 +111,26 @@ for file_path in json_files:
             f"Some messages are not dictionaries: {file_path.name}"
         )
 
-    # Convert nested JSON fields into columns
+    # Flatten nested JSON fields
     df = pd.json_normalize(
         messages,
         sep="_"
     )
+
+    # Expand position and position noise columns
+    position_columns = {
+        "receiver_pos": "receiver_pos",
+        "receiver_pos_noise": "receiver_pos_noise",
+        "sender_pos": "sender_pos",
+        "sender_pos_noise": "sender_pos_noise"
+    }
+
+    for source_column, prefix in position_columns.items():
+        expand_position_column(
+            df,
+            source_column,
+            prefix
+        )
 
     # Keep track of the original source
     df["source_file"] = file_path.name
@@ -75,8 +145,7 @@ for file_path in json_files:
     )
 
 
-
-# 4. Combine all messages
+# 5. Combine all messages
 
 final_df = pd.concat(
     all_dataframes,
@@ -92,7 +161,7 @@ print(f"DataFrame rows: {len(final_df)}")
 print(f"Number of columns: {len(final_df.columns)}")
 
 
-# 5. Verify labels and message count
+# 6. Verify labels and message count
 
 if len(final_df) != EXPECTED_TOTAL:
     raise ValueError(
@@ -117,16 +186,43 @@ if (
         "Label distribution does not match expected values!"
     )
 
-print("\nAll validation checks passed!")
 
-# 6. Save CSV
+# 7. Verify schema against Train
+
+if not TRAIN_CSV.is_file():
+    raise FileNotFoundError(
+        f"Train CSV not found: {TRAIN_CSV}"
+    )
+
+train_columns = pd.read_csv(
+    TRAIN_CSV,
+    nrows=0
+).columns.tolist()
+
+missing_columns = set(train_columns) - set(final_df.columns)
+extra_columns = set(final_df.columns) - set(train_columns)
+
+if missing_columns or extra_columns:
+    raise ValueError(
+        f"Schema mismatch!\n"
+        f"Missing columns: {sorted(missing_columns)}\n"
+        f"Extra columns: {sorted(extra_columns)}"
+    )
+
+# Match Train column order
+final_df = final_df[train_columns]
+
+print("\nSchema matches Train successfully!")
+
+
+# 8. Save CSV
 
 OUTPUT_DIR.mkdir(
     parents=True,
     exist_ok=True
 )
 
-csv_path = OUTPUT_DIR / "validation_15290.csv"
+csv_path = OUTPUT_DIR / "validation_15290_normalized.csv"
 
 if csv_path.exists():
     raise FileExistsError(
@@ -141,9 +237,9 @@ final_df.to_csv(
 )
 
 
-# 7. Save selected files list
+# 9. Save selected files list
 
-manifest_path = OUTPUT_DIR / "selected_files.txt"
+manifest_path = OUTPUT_DIR / "selected_files_normalized.txt"
 
 with open(
     manifest_path,
@@ -155,7 +251,7 @@ with open(
         file.write(file_path.name + "\n")
 
 
-# 8. Final report
+# 10. Final report
 
 print("\n====================================")
 print("CSV CONVERSION COMPLETED!")
