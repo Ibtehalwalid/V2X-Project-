@@ -1,0 +1,30 @@
+[
+    {
+        "algorithm": "RSA-3072-PSS-SHA256",
+        "key_generation_avg_ms": 258.70145999942906,
+        "key_generation_median_ms": 250.87414999870816,
+        "signing_avg_ms": 2.8145707995281555,
+        "signing_median_ms": 2.6799499974003993,
+        "signature_avg_bytes": 384,
+        "signature_median_bytes": 384.0,
+        "private_key_size_bytes": 2484,
+        "public_key_size_bytes": 625,
+        "certificate_size_bytes": 1371,
+        "signed_packet_avg_bytes": 2154,
+        "signed_packet_median_bytes": 2154.0
+    },
+    {
+        "algorithm": "ECDSA-P256-SHA256",
+        "key_generation_avg_ms": 0.058749997697304934,
+        "key_generation_median_ms": 0.024549997760914266,
+        "signing_avg_ms": 0.07235719994059764,
+        "signing_median_ms": 0.0385999956051819,
+        "signature_avg_bytes": 71.042,
+        "signature_median_bytes": 71.0,
+        "private_key_size_bytes": 241,
+        "public_key_size_bytes": 178,
+        "certificate_size_bytes": 485,
+        "signed_packet_avg_bytes": 836,
+        "signed_packet_median_bytes": 836.0
+    }
+]

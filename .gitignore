@@ -12,3 +12,14 @@ venv/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Private PKI credentials
+/Secrets/
+
+# Environment variables and passwords
+.env
+.env.*
+
+# IDE files
+.vscode/
+.idea/
